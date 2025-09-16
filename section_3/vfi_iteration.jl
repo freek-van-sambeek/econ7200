@@ -26,6 +26,12 @@ the steady state level of capital =#
 K = [(1 + 0.25 / floor(K_cardinality / 2) * (i - ceil(K_cardinality / 2))) * kss for i in 1:K_cardinality]
 
 
+"""
+   run_vfi() -> Tuple{Matrix{Float64}, Matrix{Float64}}
+
+Estimate the value and policy functions and returns the grid-evaluated functions
+at the different iterations.
+"""
 function run_vfi()
    # Initial Value Function
    vfun = zeros(Float64, (max_iters + 1, K_cardinality))
@@ -79,6 +85,19 @@ function run_vfi()
 end
 
 
+"""
+   plot_results(; vfun::Matrix{Float64}, gfun::Matrix{Float64}) -> Nothing
+
+Plot iterations of the value and policy functions.
+
+# Arguments
+- `vfun::Matrix{Float64}`: The matrix with in the iterations indexing the rows,
+   and the capital grid index indexing the columns of the value function.
+
+# Returns
+- `gfun::Matrix{Float64}`: The matrix with in the iterations indexing the rows,
+   and the capital grid index indexing the columns of the policy function.
+"""
 function plot_results(; vfun::Matrix{Float64}, gfun::Matrix{Float64})
    # Convert K to an x-axis series
    global K = vec(K)
