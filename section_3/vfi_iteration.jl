@@ -12,8 +12,7 @@ PATH_OUTPUT = "section_3/"
 # Initialize parameter values
 alpha = 0.3
 beta = 0.8
-rho = 1 / 0.8 - 1
-# rho = (1 - beta) / beta # (Shouldn't rho be this?)
+rho = 1 / beta - 1
 delta = 0.2
 B = (rho + delta) / alpha
 max_iters = 1000
