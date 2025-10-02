@@ -20,11 +20,7 @@ tolerance = 10^-6 # Tolerance of discrepancy nth value function and true value f
 Estimate the value and policy functions and returns the grid-evaluated functions
 at the different iterations.
 """
-function run_vfi(; alpha::Float64, beta::Float64, rho::Float64, delta::Float64, K::Array)
-   # Compute A and the analytical steady state
-   A = rho / a
-   kss = (1 / (alpha * beta * B) + (delta - 1) / (alpha * B))^(1 / (alpha - 1)) # K in the steady state
-
+function run_vfi(; alpha::Float64, beta::Float64, delta::Float64, K::Array, u::Function)
    # Initial Value Function
    vfun = zeros(Float64, (max_iters + 1, K_cardinality))
    gfun = copy(vfun)
@@ -45,12 +41,12 @@ function run_vfi(; alpha::Float64, beta::Float64, rho::Float64, delta::Float64, 
             vhelp = -10^10
 
             # Compute consumption as the production minus the investment
-            consumption = B * K[col_k]^alpha + (1 - delta) * K[col_k] - K[col_k_prime]
+            consumption = A * K[col_k]^alpha + (1 - delta) * K[col_k] - K[col_k_prime]
             if consumption <= 0.0
                vhelp = -10^12
             else
                # Compute the new guess for the value function
-               vhelp = log(consumption) + beta * vfun[i-1, col_k_prime]
+               vhelp = u(consumption) + beta * vfun[i-1, col_k_prime]
             end
 
             #= Check if the new guess for the value function is a valid one
@@ -90,7 +86,7 @@ Plot iterations of the value and policy functions.
 - `gfun::Matrix{Float64}`: The matrix with in the iterations indexing the rows,
    and the capital grid index indexing the columns of the policy function.
 """
-function plot_results(; vfun::Matrix{Float64}, gfun::Matrix{Float64})
+function plot_results(; K::Float64, vfun::Matrix{Float64}, gfun::Matrix{Float64})
    # Convert K to an x-axis series
    global K = vec(K)
 
@@ -119,7 +115,7 @@ function plot_results(; vfun::Matrix{Float64}, gfun::Matrix{Float64})
    capital[1] = k0
    for i in 1:101
       capital[i+1] = gfun[end, convert(Int64, floor((capital[i] - mink) / (0.25 / floor(K_cardinality / 2) * kss) + 1))]
-      consumption[i] = B * capital[i]^alpha + (1 - delta) * capital[i] - capital[i+1]
+      consumption[i] = A * capital[i]^alpha + (1 - delta) * capital[i] - capital[i+1]
    end
 
    # Plot consumption and capital over 101 time periods (t=0 to t=100)
@@ -141,21 +137,23 @@ end
 
 function main()
    ### Q3 - Q4 ###
-   # Run the VFI with the initial parameter values
    # Initialize parameter values
    alpha = 0.3
-   beta = 0.8
+   beta = 0.6
    rho = 1 / beta - 1
-   delta = 0.2
-   B = (rho + delta) / alpha
+   delta = 1
+   A = (rho + delta) / alpha
+
+   # Compute the steady state capital
+   kss = (rho / (1 - rho))^(1 / (1 - alpha))
 
    #= Fill the grid of values of starting capital containing
    the steady state level of capital =#
-   K_cardinality = 501 # Cardinality of the set K
-   K = [(1 + 0.25 / floor(K_cardinality / 2) * (i - ceil(K_cardinality / 2))) * kss for i in 1:K_cardinality]
+   K_cardinality = 5 # Cardinality of the set K
+   K = [(1 / 2 + (i -  1) / K_cardinality) * kss for i in 1:K_cardinality]
 
    # Run the VFI
-   vfun, gfun = run_vfi()
+   vfun, gfun = run_vfi(alpha=alpha, beta=beta, delta=delta, A=A, K=K, u=x->log(x))
 
    # Plot the results
    plot_results(vfun=vfun, gfun=gfun)
