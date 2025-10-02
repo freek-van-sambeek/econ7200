@@ -9,20 +9,9 @@ gr()
 # Define file logistics
 PATH_OUTPUT = "section_3/"
 
-# Initialize parameter values
-alpha = 0.3
-beta = 0.8
-rho = 1 / beta - 1
-delta = 0.2
-B = (rho + delta) / alpha
+# Define global variables
 max_iters = 1000
-kss = (1 / (alpha * beta * B) + (delta - 1) / (alpha * B))^(1 / (alpha - 1)) # K in the steady state
-K_cardinality = 501 # Cardinality of the set K
 tolerance = 10^-6 # Tolerance of discrepancy nth value function and true value function
-
-#= Fill the grid of values of starting capital containing
-the steady state level of capital =#
-K = [(1 + 0.25 / floor(K_cardinality / 2) * (i - ceil(K_cardinality / 2))) * kss for i in 1:K_cardinality]
 
 
 """
@@ -31,7 +20,11 @@ K = [(1 + 0.25 / floor(K_cardinality / 2) * (i - ceil(K_cardinality / 2))) * kss
 Estimate the value and policy functions and returns the grid-evaluated functions
 at the different iterations.
 """
-function run_vfi()
+function run_vfi(; alpha::Float64, beta::Float64, rho::Float64, delta::Float64, K::Array)
+   # Compute A and the analytical steady state
+   A = rho / a
+   kss = (1 / (alpha * beta * B) + (delta - 1) / (alpha * B))^(1 / (alpha - 1)) # K in the steady state
+
    # Initial Value Function
    vfun = zeros(Float64, (max_iters + 1, K_cardinality))
    gfun = copy(vfun)
@@ -147,8 +140,38 @@ end
 
 
 function main()
+   ### Q3 - Q4 ###
+   # Run the VFI with the initial parameter values
+   # Initialize parameter values
+   alpha = 0.3
+   beta = 0.8
+   rho = 1 / beta - 1
+   delta = 0.2
+   B = (rho + delta) / alpha
+
+   #= Fill the grid of values of starting capital containing
+   the steady state level of capital =#
+   K_cardinality = 501 # Cardinality of the set K
+   K = [(1 + 0.25 / floor(K_cardinality / 2) * (i - ceil(K_cardinality / 2))) * kss for i in 1:K_cardinality]
+
+   # Run the VFI
    vfun, gfun = run_vfi()
+
+   # Plot the results
    plot_results(vfun=vfun, gfun=gfun)
+
+   ### Q5 ###
+   
+   # Run the VFI with a different, more dense grid of values
+   
+   ### Q6 ###
+   # Compute the values of k and c for the first 100 periods
+
+   ### Q7 ###
+   # Adjust the starting parameter values
+
+   ### Q8 ###
+   # Change the utility function
 end
 
 
