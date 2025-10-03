@@ -14,14 +14,20 @@ max_iters = 1000
 tolerance = 10^-6 # Tolerance of discrepancy nth value function and true value function
 
 
+function return_grid(; kss::Float64, K_cardinality::Int64)
+   return [(1 / 2 + (i -  0.3) / K_cardinality) * kss for i in 1:K_cardinality]
+end
+
+
 """
    run_vfi() -> Tuple{Matrix{Float64}, Matrix{Float64}}
 
 Estimate the value and policy functions and returns the grid-evaluated functions
 at the different iterations.
 """
-function run_vfi(; alpha::Float64, beta::Float64, delta::Float64, K::Array, u::Function)
+function run_vfi(; alpha::Float64, beta::Float64, delta::Float64, A::Float64, K::Array, u::Function)
    # Initial Value Function
+   K_cardinality = length(K)
    vfun = zeros(Float64, (max_iters + 1, K_cardinality))
    gfun = copy(vfun)
 
@@ -58,7 +64,7 @@ function run_vfi(; alpha::Float64, beta::Float64, delta::Float64, K::Array, u::F
             end
          end
       end
-      
+
       # Compute the supremum over all k in K of the absolute difference with the previous value function
       diff = maximum(abs.(vfun[i, :] - vfun[i-1, :]))
       next!(
@@ -86,35 +92,55 @@ Plot iterations of the value and policy functions.
 - `gfun::Matrix{Float64}`: The matrix with in the iterations indexing the rows,
    and the capital grid index indexing the columns of the policy function.
 """
-function plot_results(; K::Float64, vfun::Matrix{Float64}, gfun::Matrix{Float64})
-   # Convert K to an x-axis series
-   global K = vec(K)
+function plot_results(; alpha::Float64, beta::Float64, A::Float64, delta::Float64, kss::Float64, K::Vector{Float64}, vfun::Matrix{Float64}, gfun::Matrix{Float64}, model::String)
+   # # Convert K to an x-axis series
+   # K = vec(K)
+
+   # Obtain the cardinality of K again
+   K_cardinality = length(K)
+
+   # Compute the analytical solution
+   a_1 = alpha / (1 - alpha * beta)
+   a_0 = ((1 + beta * a_1) * (log(A) - log(1 + beta * a_1)) + beta * a_1 * log(beta * a_1)) / (1 - beta)
+   # a0 = (log(B * (1 - alpha * beta)) + alpha * beta / (1 - alpha * beta) * log(alpha * beta * B)) / (1 - beta)
+   v_analytical = [(a_0 + a_1 * log(K[i])) for i in 1:K_cardinality]
+   g_analytical = [(alpha * beta * A * K[i]^alpha) for i in 1:K_cardinality]
 
    # Plot various iterations of the value function over the grid of K
    plot(K, permutedims(vfun[[1, 2, 3, 11, end], :]), label=["v0" "v1" "v2" "v10" "Converged v"])
+   if !occursin("sigma", model)
+      plot!(K, v_analytical, label="Analytical v", ls=:dash, color=:black)
+   end
    xlabel!("Capital Stock k Today")
    ylabel!("Value Function")
    title!("Value Function: True and Approximated")
    xlims!(K[1], K[end])
-   ylims!(0, 2)
-   savefig(string(PATH_OUTPUT, "value_function_iteration.pdf"))
-
+   # ylims!(0, 2)
+   savefig(string(PATH_OUTPUT, "value_function_iteration_", model, ".pdf"))
+   
    # Plot various iterations of the policy function over the grid of K
    plot(K, permutedims(gfun[[2, 3, 11, end], :]), label=["g2" "g3" "g11" "Converged g"])
+   if !occursin("sigma", model)
+      plot!(K, g_analytical, label="Analytical g", ls=:dash, color=:black)
+   end
    xlabel!("Capital Stock k Today")
    ylabel!("Policy Function")
    title!("Policy Function: True and Approximated")
-   savefig(string(PATH_OUTPUT, "policy_function.pdf"))
-
+   savefig(string(PATH_OUTPUT, "policy_function_", model, ".pdf"))
+   
    #= Plot capital over time assuming we start at capital below the steady state,
    and using the converged policy function =#
-   k0 = 0.9 * kss
-   mink = K[1]
+   k0 = 0.8 * kss
+   min_k = K[1] / kss
+   max_k = K[end] / kss
    consumption = zeros(Float64, (101, 1)) # Consumption
    capital = zeros(Float64, (102, 1)) # Capital
    capital[1] = k0
+   # println(K)
+   # println(gfun[end, :])
    for i in 1:101
-      capital[i+1] = gfun[end, convert(Int64, floor((capital[i] - mink) / (0.25 / floor(K_cardinality / 2) * kss) + 1))]
+      # println(convert(Int64, floor((capital[i] / kss - min_k) / (max_k - min_k) * K_cardinality) + 1))
+      capital[i+1] = gfun[end, convert(Int64, floor((capital[i] / kss - min_k) / (max_k - min_k) * K_cardinality) + 1)]
       consumption[i] = A * capital[i]^alpha + (1 - delta) * capital[i] - capital[i+1]
    end
 
@@ -125,23 +151,23 @@ function plot_results(; K::Float64, vfun::Matrix{Float64}, gfun::Matrix{Float64}
    xlabel!("Time")
    ylabel!("c(t)")
    title!("c(t) over time")
-   savefig(string(PATH_OUTPUT, "evolution_consumption.pdf"))
+   savefig(string(PATH_OUTPUT, "evolution_consumption_", model, ".pdf"))
 
    plot(t, capital[2:102])
    xlabel!("Time")
    ylabel!("k(t)")
    title!("k(t) over time")
-   savefig(string(PATH_OUTPUT, "evolution_capital.pdf"))
+   savefig(string(PATH_OUTPUT, "evolution_capital_",  model, ".pdf"))
 end
 
 
 function main()
-   ### Q3 - Q4 ###
+   ### Q3 - Q4 ### - Run VFI
    # Initialize parameter values
    alpha = 0.3
    beta = 0.6
    rho = 1 / beta - 1
-   delta = 1
+   delta = 1.0
    A = (rho + delta) / alpha
 
    # Compute the steady state capital
@@ -149,27 +175,43 @@ function main()
 
    #= Fill the grid of values of starting capital containing
    the steady state level of capital =#
-   K_cardinality = 5 # Cardinality of the set K
-   K = [(1 / 2 + (i -  1) / K_cardinality) * kss for i in 1:K_cardinality]
+   K = return_grid(kss=kss, K_cardinality=5)
+   
+   # Run the VFI
+   vfun, gfun = run_vfi(alpha=alpha, beta=beta, delta=delta, A=A, K=K, u=x->log(x))
+   
+   # Plot the results
+   plot_results(alpha=alpha, beta=beta, A=A, delta=delta, kss=kss, K=K, vfun=vfun, gfun=gfun, model="coarse")
+   
+   ### Q5 - Q6 ### - Run the VFI with a different, more dense grid of values
+   K = return_grid(kss=kss, K_cardinality=200)
 
    # Run the VFI
    vfun, gfun = run_vfi(alpha=alpha, beta=beta, delta=delta, A=A, K=K, u=x->log(x))
-
+   
    # Plot the results
-   plot_results(vfun=vfun, gfun=gfun)
-
-   ### Q5 ###
+   plot_results(alpha=alpha, beta=beta, A=A, delta=delta, kss=kss, K=K, vfun=vfun, gfun=gfun, model="fine")
    
-   # Run the VFI with a different, more dense grid of values
-   
-   ### Q6 ###
-   # Compute the values of k and c for the first 100 periods
-
    ### Q7 ###
    # Adjust the starting parameter values
+   beta = 0.8
+   rho = 1 / beta - 1
+   A = (rho + 0.2) / alpha
 
-   ### Q8 ###
-   # Change the utility function
+   # Run the VFI
+   vfun, gfun = run_vfi(alpha=alpha, beta=beta, delta=delta, A=A, K=K, u=x->log(x))
+   
+   # Plot the results
+   plot_results(alpha=alpha, beta=beta, A=A, delta=delta, kss=kss, K=K, vfun=vfun, gfun=gfun, model="fine_alternative")
+   
+   ### Q8 ### - Change the utility function
+   for sigma in [0.5, 2]
+      # Run the VFI
+      vfun, gfun = run_vfi(alpha=alpha, beta=beta, delta=delta, A=A, K=K, u=x->(x^(1 - sigma) - 1) / (1 - sigma))
+
+      # Plot the results
+      plot_results(alpha=alpha, beta=beta, A=A, delta=delta, kss=kss, K=K, vfun=vfun, gfun=gfun, model=string("fine_sigma_", sigma))
+   end
 end
 
 
