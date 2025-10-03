@@ -1,4 +1,5 @@
 # Load packages
+using DataFrames
 using Plots
 using ProgressMeter
 
@@ -133,8 +134,8 @@ function plot_results(; alpha::Float64, beta::Float64, A::Float64, delta::Float6
    k0 = 0.8 * kss
    min_k = K[1] / kss
    max_k = K[end] / kss
-   consumption = zeros(Float64, (101, 1)) # Consumption
-   capital = zeros(Float64, (102, 1)) # Capital
+   consumption = zeros(Float64, 101) # Consumption
+   capital = zeros(Float64, 102) # Capital
    capital[1] = k0
    # println(K)
    # println(gfun[end, :])
@@ -143,6 +144,10 @@ function plot_results(; alpha::Float64, beta::Float64, A::Float64, delta::Float6
       capital[i+1] = gfun[end, convert(Int64, floor((capital[i] / kss - min_k) / (max_k - min_k) * K_cardinality) + 1)]
       consumption[i] = A * capital[i]^alpha + (1 - delta) * capital[i] - capital[i+1]
    end
+
+   # Print a table with the capital and consumption paths
+   df = DataFrame(Capital = capital[2:end], Consumption = consumption)
+   println(df)
 
    # Plot consumption and capital over 101 time periods (t=0 to t=100)
    t = range(start=0, stop=100, length=101)
